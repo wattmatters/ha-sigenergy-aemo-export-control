@@ -1,0 +1,421 @@
+alias: "SIGEN - AEMO CRITICAL EVENT EXPORT CONTROL (Native Sensors)"
+description: >-
+  Manages battery export during AEMO critical price events using the native HACS
+  AEMO NEM integration. Monitors realtime price with predictive pre-alert from the
+  5-minute forecast. Intervenes only when not already exporting at maximum rate.
+
+# ─────────────────────────────────────────────────────────────────
+# CONFIGURATION — edit these to match your system
+# ─────────────────────────────────────────────────────────────────
+#
+# Replace the sensor/entity IDs below with the ones from YOUR system.
+# All substitutions are marked with a comment beginning with ← REPLACE
+#
+# AEMO region sensor prefix: sensor.aemo_nemweb_<REGION>_
+#   e.g. NSW1 → sensor.aemo_nemweb_nsw1_realtime_price
+#        VIC1 → sensor.aemo_nemweb_vic1_realtime_price
+#
+# SIGEN entity prefix: sensor/number/switch.sigen_0_...
+#   Check your SIGEN integration for the exact entity IDs.
+#
+# ─────────────────────────────────────────────────────────────────
+
+variables:
+  # ← REPLACE region prefix as needed (nsw1, vic1, sa1, qld1, etc.)
+  realtime_price_mwh: >-
+    {{ (states('sensor.aemo_nemweb_nsw1_realtime_price') | float(0) * 1000) | round(0) }}
+  forecast_price_mwh: >-
+    {{ (states('sensor.aemo_nemweb_nsw1_5min_forecast') | float(0) * 1000) | round(0) }}
+  critical_threshold: >-
+    {{ states('input_number.aemo_critical_threshold') | float(3) }}
+  pre_alert_threshold: >-
+    {{ states('input_number.aemo_pre_alert_threshold') | float(2) }}
+
+mode: queued
+max: 5
+
+trigger:
+  - platform: template
+    value_template: >-
+      {{ states('sensor.aemo_nemweb_nsw1_realtime_price') | float(0) >   # ← REPLACE region
+         states('input_number.aemo_critical_threshold') | float(3) }}
+    id: critical_event_start
+
+  - platform: template
+    value_template: >-
+      {{ states('sensor.aemo_nemweb_nsw1_realtime_price') | float(0) <   # ← REPLACE region
+         states('input_number.aemo_critical_threshold') | float(3) }}
+    id: critical_event_end
+
+  - platform: template
+    value_template: >-
+      {{ states('sensor.aemo_nemweb_nsw1_5min_forecast') | float(0) >    # ← REPLACE region
+         states('input_number.aemo_pre_alert_threshold') | float(2) }}
+    id: pre_alert_start
+
+  - platform: template
+    value_template: >-
+      {{ states('sensor.aemo_nemweb_nsw1_5min_forecast') | float(0) <    # ← REPLACE region
+         states('input_number.aemo_pre_alert_threshold') | float(2) }}
+    id: pre_alert_end
+
+  - platform: time_pattern
+    minutes: "/1"
+    id: monitor_during_event
+
+condition: []
+
+action:
+  - choose:
+
+      # ── CRITICAL EVENT START ─────────────────────────────────────
+      - conditions:
+          - condition: trigger
+            id: critical_event_start
+        sequence:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.aemo_critical_event
+
+          - action: input_number.set_value
+            data:
+              value: "{{ realtime_price_mwh }}"
+            target:
+              entity_id: input_number.aemo_nsw_spot_price  # ← REPLACE if different
+
+          # Only proceed if sufficient battery charge remains
+          - condition: numeric_state
+            entity_id: sensor.sigen_0_inverter_1_available_battery_discharge_energy  # ← REPLACE
+            above: 5  # kWh — adjust your minimum reserve
+
+          - choose:
+
+              # Scenario A: Already exporting at max during peak window — no action needed
+              - conditions:
+                  - condition: time
+                    after: "17:59:50"
+                    before: "20:00:00"  # ← ADJUST to your peak export window
+                  - condition: state
+                    entity_id: input_boolean.battery_export_enabled  # ← REPLACE if different
+                    state: "on"
+                  - condition: state
+                    entity_id: switch.sigen_0_plant_remote_ems  # ← REPLACE
+                    state: "on"
+                  - condition: template
+                    value_template: >-
+                      {{ states('number.sigen_0_plant_grid_max_export_limit') | float >= 4.5 }}  # ← REPLACE
+                sequence:
+                  - action: persistent_notification.create
+                    data:
+                      notification_id: aemo_critical_status
+                      title: "✅ AEMO Critical - Already Exporting"
+                      message: >-
+                        Critical event detected at ${{ realtime_price_mwh }}/MWh.
+                        Already exporting at maximum rate during peak period. No intervention needed.
+
+              # Scenario B: Solar charging window — override to export
+              - conditions:
+                  - condition: time
+                    after: "10:59:50"
+                    before: "14:00:00"  # ← ADJUST to your solar / cheap-rate window
+                  - condition: state
+                    entity_id: switch.sigen_0_plant_remote_ems  # ← REPLACE
+                    state: "on"
+                sequence:
+                  - action: input_boolean.turn_on
+                    target:
+                      entity_id: input_boolean.aemo_critical_override_active
+                  - action: number.set_value
+                    data:
+                      value: 0
+                    target:
+                      entity_id: number.sigen_0_plant_max_charging_limit  # ← REPLACE
+                  - delay: "00:00:02"
+                  # ← REPLACE device_id, entity_id and option with your SIGEN select entity
+                  - device_id: YOUR_SIGEN_DEVICE_ID
+                    domain: select
+                    entity_id: YOUR_SIGEN_OPERATING_MODE_SELECT_ENTITY_ID
+                    type: select_option
+                    option: "Command Discharging (Output power from PV first)"
+                  - delay: "00:00:02"
+                  - action: number.set_value
+                    data:
+                      value: 5  # kW — adjust to your inverter's max export
+                    target:
+                      entity_id: number.sigen_0_plant_grid_max_export_limit  # ← REPLACE
+                  - action: persistent_notification.create
+                    data:
+                      notification_id: aemo_critical_status
+                      title: "⚡ AEMO Critical - Override Active"
+                      message: >-
+                        Critical event at ${{ realtime_price_mwh }}/MWh.
+                        Overriding charging mode - switched to EXPORT.
+                        Battery discharging at maximum rate to grid.
+
+              # Scenario C: Remote EMS is off — enable it and start exporting
+              - conditions:
+                  - condition: template
+                    value_template: "{{ states('switch.sigen_0_plant_remote_ems') == 'off' }}"  # ← REPLACE
+                sequence:
+                  - action: input_boolean.turn_on
+                    target:
+                      entity_id: input_boolean.aemo_critical_override_active
+                  # ← REPLACE device_id and entity_id with your Remote EMS switch
+                  - type: turn_on
+                    device_id: YOUR_SIGEN_DEVICE_ID
+                    entity_id: YOUR_SIGEN_REMOTE_EMS_SWITCH_ENTITY_ID
+                    domain: switch
+                  - delay: "00:00:02"
+                  - action: number.set_value
+                    data:
+                      value: 5  # ← REPLACE with your max export kW
+                    target:
+                      entity_id: number.sigen_0_plant_grid_max_export_limit  # ← REPLACE
+                  - delay: "00:00:02"
+                  # ← REPLACE device_id, entity_id and option with your SIGEN select entity
+                  - device_id: YOUR_SIGEN_DEVICE_ID
+                    domain: select
+                    entity_id: YOUR_SIGEN_OPERATING_MODE_SELECT_ENTITY_ID
+                    type: select_option
+                    option: "Command Discharging (Output power from PV first)"
+                  - action: persistent_notification.create
+                    data:
+                      notification_id: aemo_critical_status
+                      title: "⚡ AEMO Critical - Export Enabled"
+                      message: >-
+                        Critical event at ${{ realtime_price_mwh }}/MWh.
+                        Enabled Remote EMS and battery export.
+                        Battery discharging at maximum rate to grid.
+
+              # Scenario D: Remote EMS on but export rate too low — increase it
+              - conditions:
+                  - condition: state
+                    entity_id: switch.sigen_0_plant_remote_ems  # ← REPLACE
+                    state: "on"
+                  - condition: template
+                    value_template: >-
+                      {{ states('number.sigen_0_plant_grid_max_export_limit') | float < 4.5 }}  # ← REPLACE
+                sequence:
+                  - action: input_boolean.turn_on
+                    target:
+                      entity_id: input_boolean.aemo_critical_override_active
+                  - action: number.set_value
+                    data:
+                      value: 5  # ← REPLACE with your max export kW
+                    target:
+                      entity_id: number.sigen_0_plant_grid_max_export_limit  # ← REPLACE
+                  - action: persistent_notification.create
+                    data:
+                      notification_id: aemo_critical_status
+                      title: "⚡ AEMO Critical - Rate Increased"
+                      message: >-
+                        Critical event at ${{ realtime_price_mwh }}/MWh.
+                        Increased export rate to maximum (5 kW).
+
+            # Default: Battery too low
+            default:
+              - action: persistent_notification.create
+                data:
+                  notification_id: aemo_critical_status
+                  title: "⚠️ AEMO Critical - Insufficient Battery"
+                  message: >-
+                    Critical event at ${{ realtime_price_mwh }}/MWh.
+                    Battery too low to export
+                    ({{ states('sensor.sigen_0_inverter_1_available_battery_discharge_energy') }} kWh available).  # ← REPLACE
+                    Minimum 5 kWh reserve maintained for backup power.
+
+      # ── PRE-ALERT START ──────────────────────────────────────────
+      - conditions:
+          - condition: trigger
+            id: pre_alert_start
+        sequence:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.aemo_pre_alert
+          - action: persistent_notification.create
+            data:
+              notification_id: aemo_pre_alert_status
+              title: "⚠️ AEMO Pre-Alert Active"
+              message: >-
+                Price forecast: ${{ forecast_price_mwh }}/MWh
+                Realtime: ${{ realtime_price_mwh }}/MWh
+                Forecast indicates potential critical event approaching.
+                Monitor battery charge status - may need to preserve capacity for export.
+
+      # ── PRE-ALERT END ────────────────────────────────────────────
+      - conditions:
+          - condition: trigger
+            id: pre_alert_end
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.aemo_pre_alert
+          - action: persistent_notification.dismiss
+            data:
+              notification_id: aemo_pre_alert_status
+
+      # ── 1-MINUTE MONITOR (while override active) ─────────────────
+      - conditions:
+          - condition: trigger
+            id: monitor_during_event
+          - condition: state
+            entity_id: input_boolean.aemo_critical_event
+            state: "on"
+          - condition: state
+            entity_id: input_boolean.aemo_critical_override_active
+            state: "on"
+        sequence:
+          - action: input_number.set_value
+            data:
+              value: "{{ realtime_price_mwh }}"
+            target:
+              entity_id: input_number.aemo_nsw_spot_price  # ← REPLACE if different
+
+          - choose:
+              # Battery hit minimum — stop exporting
+              - conditions:
+                  - condition: numeric_state
+                    entity_id: sensor.sigen_0_inverter_1_available_battery_discharge_energy  # ← REPLACE
+                    below: 5  # ← Match your minimum reserve
+                sequence:
+                  - action: input_boolean.turn_off
+                    target:
+                      entity_id: input_boolean.aemo_critical_override_active
+                  # ← REPLACE device_id, entity_id and option
+                  - device_id: YOUR_SIGEN_DEVICE_ID
+                    domain: select
+                    entity_id: YOUR_SIGEN_OPERATING_MODE_SELECT_ENTITY_ID
+                    type: select_option
+                    option: "Maximum Self-consumption (Default)"
+                  - delay: "00:00:02"
+                  # ← REPLACE device_id and entity_id with your Remote EMS switch
+                  - type: turn_off
+                    device_id: YOUR_SIGEN_DEVICE_ID
+                    entity_id: YOUR_SIGEN_REMOTE_EMS_SWITCH_ENTITY_ID
+                    domain: switch
+                  - action: persistent_notification.create
+                    data:
+                      notification_id: aemo_critical_status
+                      title: "🛑 AEMO Critical - Battery Low"
+                      message: >-
+                        Battery reached minimum safe level
+                        ({{ states('sensor.sigen_0_inverter_1_available_battery_discharge_energy') }} kWh).  # ← REPLACE
+                        Export stopped to maintain 5 kWh backup reserve.
+                        Event still active at ${{ realtime_price_mwh }}/MWh.
+
+              # Export rate has dropped or EMS turned off — restore
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ states('number.sigen_0_plant_grid_max_export_limit') | float < 4.5   # ← REPLACE
+                         or states('switch.sigen_0_plant_remote_ems') == 'off' }}             # ← REPLACE
+                sequence:
+                  - condition: state
+                    entity_id: switch.sigen_0_plant_remote_ems  # ← REPLACE
+                    state: "off"
+                  # ← REPLACE device_id and entity_id with your Remote EMS switch
+                  - type: turn_on
+                    device_id: YOUR_SIGEN_DEVICE_ID
+                    entity_id: YOUR_SIGEN_REMOTE_EMS_SWITCH_ENTITY_ID
+                    domain: switch
+                  - delay: "00:00:02"
+                  - action: number.set_value
+                    data:
+                      value: 5  # ← REPLACE with your max export kW
+                    target:
+                      entity_id: number.sigen_0_plant_grid_max_export_limit  # ← REPLACE
+
+      # ── CRITICAL EVENT END ───────────────────────────────────────
+      - conditions:
+          - condition: trigger
+            id: critical_event_end
+          - condition: state
+            entity_id: input_boolean.aemo_critical_override_active
+            state: "on"
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.aemo_critical_event
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.aemo_critical_override_active
+          - action: input_number.set_value
+            data:
+              value: "{{ realtime_price_mwh }}"
+            target:
+              entity_id: input_number.aemo_nsw_spot_price  # ← REPLACE if different
+
+          - choose:
+              # End during solar/charging window — restore charging
+              - conditions:
+                  - condition: time
+                    after: "10:59:50"
+                    before: "14:00:00"  # ← ADJUST to match your solar window
+                sequence:
+                  # ← REPLACE device_id, entity_id and option
+                  - device_id: YOUR_SIGEN_DEVICE_ID
+                    domain: select
+                    entity_id: YOUR_SIGEN_OPERATING_MODE_SELECT_ENTITY_ID
+                    type: select_option
+                    option: "Command Charging (Consume power from the PV first)"
+                  - delay: "00:00:02"
+                  - action: number.set_value
+                    data:
+                      value: >-
+                        {% set rate = states('input_number.battery_charge_suggested_rate') | float %}
+                        {% if rate <= 0 %}
+                          0
+                        {% else %}
+                          {{ [16.5, (rate / 0.5) | round(0, 'ceil') * 0.5] | min }}
+                        {% endif %}
+                    target:
+                      entity_id: number.sigen_0_plant_max_charging_limit  # ← REPLACE
+                  - action: persistent_notification.create
+                    data:
+                      notification_id: aemo_critical_status
+                      title: "✅ AEMO Critical Ended - Charging Restored"
+                      message: >-
+                        Critical event ended. Price now ${{ realtime_price_mwh }}/MWh.
+                        Restored charging automation control.
+
+              # End during peak window — continue normal export, no change needed
+              - conditions:
+                  - condition: time
+                    after: "17:59:50"
+                    before: "20:00:00"  # ← ADJUST to match your peak window
+                sequence:
+                  - action: persistent_notification.create
+                    data:
+                      notification_id: aemo_critical_status
+                      title: "✅ AEMO Critical Ended - Peak Export Active"
+                      message: >-
+                        Critical event ended. Price now ${{ realtime_price_mwh }}/MWh.
+                        Peak export period still active - continuing normal export.
+
+            # Default: Return to self-consumption mode
+            default:
+              # ← REPLACE device_id, entity_id and option
+              - device_id: YOUR_SIGEN_DEVICE_ID
+                domain: select
+                entity_id: YOUR_SIGEN_OPERATING_MODE_SELECT_ENTITY_ID
+                type: select_option
+                option: "Maximum Self-consumption (Default)"
+              - delay: "00:00:02"
+              - action: number.set_value
+                data:
+                  value: 5  # ← REPLACE with your normal export limit kW
+                target:
+                  entity_id: number.sigen_0_plant_grid_max_export_limit  # ← REPLACE
+              - delay: "00:00:02"
+              # ← REPLACE device_id and entity_id with your Remote EMS switch
+              - type: turn_off
+                device_id: YOUR_SIGEN_DEVICE_ID
+                entity_id: YOUR_SIGEN_REMOTE_EMS_SWITCH_ENTITY_ID
+                domain: switch
+              - action: persistent_notification.create
+                data:
+                  notification_id: aemo_critical_status
+                  title: "✅ AEMO Critical Ended - Normal Mode"
+                  message: >-
+                    Critical event ended. Price now ${{ realtime_price_mwh }}/MWh.
+                    Returned to self-consumption mode.
