@@ -121,7 +121,7 @@ If you don't have such an automation, you have two options:
 
 ## How thresholds work
 
-Prices in the AEMO NEM Web integration are in **$/MWh**. The automation multiplies by 1,000 to convert to **$/MWh display values** (so `3.0` in `input_number.aemo_critical_threshold` = $3,000/MWh). Adjust these to suit your VPP agreement or personal threshold for when exporting makes financial sense.
+Prices from the AEMO NEM Web integration are reported in **$/kWh**. The automation multiplies these by 1,000 to convert to the more familiar **$/MWh** figures used in AEMO market reporting — so a sensor value of `0.003` becomes `$3/MWh` for display purposes. The `input_number` threshold helpers use the same $/MWh scale, so set `input_number.aemo_critical_threshold` to `3000` if you want to trigger at $3,000/MWh. Adjust to suit your VPP agreement or personal threshold for when exporting makes financial sense.
 
 The **pre-alert** triggers on the 5-minute forecast, giving you advance warning before the realtime price crosses the critical threshold. It doesn't change inverter behaviour — it just sets a flag and sends a notification so you can keep an eye on battery SoC.
 
