@@ -1,4 +1,4 @@
-# SIGEN – AEMO Critical Event Export Control (Native Sensors)
+# SIGEN – AEMO Critical Event Export Control
 
 A Home Assistant automation **shared as an example** for Sigenergy energy controller owners in the Australian NEM who want to automatically maximise battery export during AEMO critical price events. It is posted here as a reference to adapt to your own system — not as a plug-and-play solution.
 

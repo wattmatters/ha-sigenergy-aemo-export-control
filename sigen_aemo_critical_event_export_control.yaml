@@ -1,4 +1,4 @@
-alias: "SIGEN - AEMO CRITICAL EVENT EXPORT CONTROL (Native Sensors)"
+alias: "SIGEN - AEMO CRITICAL EVENT EXPORT CONTROL"
 description: >-
   Manages battery export during AEMO critical price events using the native HACS
   AEMO NEM integration. Monitors realtime price with predictive pre-alert from the
