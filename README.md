@@ -60,7 +60,15 @@ Create these in **Settings → Devices & Services → Helpers** before importing
 | `input_boolean.aemo_critical_override_active` | Toggle | — |
 | `input_boolean.aemo_pre_alert` | Toggle | — |
 | `input_boolean.battery_export_enabled` | Toggle | — |
-| `input_number.battery_charge_suggested_rate` | Number | your normal charge rate (kW) |
+| `input_number.battery_charge_suggested_rate` *(optional)* | Number | your normal charge rate (kW) |
+
+### Optional: charge rate integration
+
+`input_number.battery_charge_suggested_rate` is an **optional integration point** for users who have a separate automation that calculates an optimal battery charge rate (for example, based on a solar forecast, time-of-use tariff, or Amber Electric pricing). When a critical event ends during the solar/charging window, this automation reads that helper and restores whatever charge rate it recommends, rather than using a fixed value.
+
+If you don't have such an automation, you have two options:
+- **Create the helper anyway** and set it to your preferred fixed charge rate in kW — the automation will simply always restore to that value
+- **Edit the YAML** and replace the template in the "Charging Restored" branch with a plain `value: X` (where X is your charge rate in kW), removing the dependency entirely
 
 ---
 
