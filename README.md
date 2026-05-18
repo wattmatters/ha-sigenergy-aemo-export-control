@@ -1,6 +1,8 @@
 # SIGEN – AEMO Critical Event Export Control (Native Sensors)
 
-A Home Assistant automation for **SIGEN inverter owners in the Australian NEM** that automatically maximises battery export to the grid during AEMO critical price events, using native HACS integrations — no paid services or external APIs required.
+A Home Assistant automation **shared as an example** for Sigenergy energy controller owners in the Australian NEM who want to automatically maximise battery export during AEMO critical price events. It is posted here as a reference to adapt to your own system — not as a plug-and-play solution.
+
+The automation was developed and tested on a specific system (see [Tested on](#known-limitations--notes)) and makes assumptions about time windows, helper entities, and operating modes that reflect that setup. You will almost certainly need to modify it to suit your own tariff schedule, inverter configuration, and broader Home Assistant automations.
 
 ---
 
@@ -10,7 +12,7 @@ A Home Assistant automation for **SIGEN inverter owners in the Australian NEM** 
 - **Pre-alerts** based on the 5-minute forecast price before an event officially starts
 - **Automatically switches your SIGEN battery to maximum export mode** when a critical event is detected, subject to configurable time windows and a minimum battery reserve
 - **Monitors every minute** during an active event to handle edge cases (battery depletion, Remote EMS turning off, export rate dropping)
-- **Restores your normal operating mode** when the event ends, with context-aware handling for solar charging windows and peak export periods
+- **Restores your normal operating mode** when the event ends, with context-aware handling for solar charging windows and peak export periods — *these time windows are specific to the author's system and will need adjusting*
 - **Sends persistent notifications** at every state change so you always know what's happening
 
 ### Logic overview
@@ -34,13 +36,25 @@ Event ends?
 
 ## Requirements
 
-### Hardware
-- **SIGEN inverter** with a Home Assistant integration (HACS or custom) that exposes:
-  - `switch.sigen_0_plant_remote_ems` — Remote EMS toggle
-  - `number.sigen_0_plant_grid_max_export_limit` — Grid export limit (kW)
-  - `number.sigen_0_plant_max_charging_limit` — Max charge rate (kW)
-  - An operating mode `select` entity (e.g. Self-consumption / Command Charging / Command Discharging)
-  - `sensor.sigen_0_inverter_1_available_battery_discharge_energy` — Available discharge energy (kWh)
+### Hardware — SIGEN inverter integration
+
+This automation requires a Home Assistant integration for your SIGEN inverter. There are two common options; sensor naming differs between them, so you will need to identify the correct entity IDs in your own instance using **Developer Tools → States**.
+
+#### Option A: sigenergy2mqtt (add-on)
+[seud0nym/home-assistant-addons](https://github.com/seud0nym/home-assistant-addons/tree/main/sigenergy2mqtt) — a Mosquitto/MQTT-based add-on. This is the integration used when developing and testing this automation. Entity names follow the pattern used throughout this YAML (e.g. `sigen_0_plant_...`, `sigen_0_inverter_1_...`).
+
+#### Option B: Sigenergy Local Modbus (HACS)
+[TypQxQ/Sigenergy-Local-Modbus](https://github.com/TypQxQ/Sigenergy-Local-Modbus) — a HACS integration using local Modbus polling. Entity naming may differ from the examples in this YAML; use Developer Tools → States to find your equivalents.
+
+Whichever integration you use, you need entities that expose:
+
+| Function | Example entity (sigenergy2mqtt) | What to look for |
+|---|---|---|
+| Remote EMS toggle | `switch.sigen_0_plant_remote_ems` | A switch controlling remote EMS / grid export mode |
+| Grid export limit | `number.sigen_0_plant_grid_max_export_limit` | A number entity for max grid export in kW |
+| Max charge rate | `number.sigen_0_plant_max_charging_limit` | A number entity for max charge rate in kW |
+| Operating mode | *(select entity)* | A select with options like Self-consumption, Command Charging, Command Discharging |
+| Available discharge energy | `sensor.sigen_0_inverter_1_available_battery_discharge_energy` | A sensor for usable battery energy in kWh |
 
 ### HACS Integrations
 - [**AEMO NEM Web**](https://github.com/pvandenh/aemo_nemweb) — install via HACS, providing:
@@ -131,13 +145,13 @@ The automation sends persistent notifications to your HA dashboard for every sta
 - The automation is written for **SIGEN inverters** and uses device-action calls (by `device_id`) for the operating mode select. These cannot be replaced with simple entity service calls — you must supply your own `device_id`.
 - Time windows are hardcoded. If your tariff windows change seasonally, update them accordingly or consider converting to `input_datetime` helpers.
 - The automation assumes a **5 kW maximum export limit**. Adjust if your inverter or DNSP export limit differs.
-- Tested on **Home Assistant 2024.x** with a SIGEN hybrid inverter in the NSW NEM region.
+- Tested on **Home Assistant OS 17.3 / Core 2026.5.2 / Supervisor 2026.05.0** with a **Sigenergy 12 kW Single Phase Energy Controller** in the NSW NEM region, using the **sigenergy2mqtt** add-on integration.
 
 ---
 
 ## Contributing
 
-Issues and PRs welcome. If you adapt this for a different inverter brand or NEM region, please open a PR or issue — it would be great to document other configurations here.
+This is shared in the spirit of giving others a starting point — if you adapt it for a different inverter, NEM region, or tariff structure, feel free to open a PR or issue to share what you changed. That kind of context could save the next person a lot of time.
 
 ---
 
