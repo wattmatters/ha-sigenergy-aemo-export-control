@@ -67,8 +67,8 @@ Create these in **Settings → Devices & Services → Helpers** before importing
 
 | Entity | Type | Suggested default |
 |---|---|---|
-| `input_number.aemo_critical_threshold` | Number | 3.0 (= $3,000/MWh) |
-| `input_number.aemo_pre_alert_threshold` | Number | 2.0 (= $2,000/MWh) |
+| `input_number.aemo_critical_threshold` | Number | 2.0 (= $2,000/MWh) |
+| `input_number.aemo_pre_alert_threshold` | Number | 1.5 (= $1,500/MWh) |
 | `input_number.aemo_nsw_spot_price` | Number | 0 (updated automatically) |
 | `input_boolean.aemo_critical_event` | Toggle | — |
 | `input_boolean.aemo_critical_override_active` | Toggle | — |
@@ -121,7 +121,9 @@ If you don't have such an automation, you have two options:
 
 ## How thresholds work
 
-Prices from the AEMO NEM Web integration are reported in **$/kWh**. The automation multiplies these by 1,000 to convert to the more familiar **$/MWh** figures used in AEMO market reporting — so a sensor value of `0.003` becomes `$3/MWh` for display purposes. The `input_number` threshold helpers use the same $/MWh scale, so set `input_number.aemo_critical_threshold` to `3000` if you want to trigger at $3,000/MWh. Adjust to suit your VPP agreement or personal threshold for when exporting makes financial sense.
+Prices from the AEMO NEM Web integration are reported in **$/kWh**, and the threshold helpers use the same $/kWh scale. The automation multiplies by 1,000 purely for display in notifications, converting to the **$/MWh** figures familiar from AEMO market reporting (e.g. a threshold of `2` $/kWh displays as $2,000/MWh in notifications).
+
+Set your thresholds in $/kWh — for example `2.0` for a $2,000/MWh critical threshold. Adjust to suit your VPP agreement or personal threshold for when exporting makes financial sense.
 
 The **pre-alert** triggers on the 5-minute forecast, giving you advance warning before the realtime price crosses the critical threshold. It doesn't change inverter behaviour — it just sets a flag and sends a notification so you can keep an eye on battery SoC.
 
