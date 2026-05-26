@@ -8,6 +8,12 @@ These automations were developed and tested on a **Sigenergy 12 kW Single Phase 
 
 ---
 
+## Acknowledgements
+
+These automations were developed with assistance from [Claude](https://claude.ai), Anthropic's AI assistant, which helped with automation logic, anonymisation, and documentation.
+
+---
+
 ## Automations
 
 | Automation | Description |
