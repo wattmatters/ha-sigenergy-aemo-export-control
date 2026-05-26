@@ -24,6 +24,8 @@ These automations were developed with assistance from [Claude](https://claude.ai
 | [EV DC Charger Stop Cooldown Timer](./ev-dc-charger-cooldown/) | Starts a cooldown timer when DC charging stops, preventing other automations from acting before load sensors settle |
 | [Grid Bias Offset Export](./grid-bias-offset-export/) | Applies a small persistent export offset to eliminate metering bias imports the inverter cannot detect |
 
+Note: there are also two Node Red flows associated with these automations and the code and documentation for these flows are yet to be uploaded.
+
 ---
 
 ## Common Requirements
