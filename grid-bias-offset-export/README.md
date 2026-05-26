@@ -8,7 +8,9 @@ This is posted as a reference to adapt to your own system — not as a plug-and-
 
 ## What it does
 
-The Sigenergy system can exhibit a small metering bias — a tendency to allow a few watts of grid import even when in self-consumption mode. This automation addresses that by applying a tiny forced export offset (e.g. 30 W) via Remote EMS Command Discharging mode, effectively shifting the operating point so the net grid flow sits at or just below zero.
+**What is metering bias?** Metering bias occurs when the energy flow reported by the Sigenergy inverter's internal metering does not match what the utility (electricity retailer) meter records. In practice, the inverter may believe it is at net zero or exporting, while the utility meter is recording a small import. This discrepancy arises because the Sigenergy system controls based on its own sensor readings and cannot see the utility meter directly.
+
+This automation addresses that by applying a tiny forced export offset (e.g. 30 W) via Remote EMS Command Discharging mode, effectively shifting the inverter's operating point so the net grid flow as seen by the utility meter sits at or just below zero — eliminating the small phantom imports that would otherwise appear on your bill.
 
 It operates in five scenarios:
 
