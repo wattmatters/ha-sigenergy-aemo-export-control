@@ -41,15 +41,16 @@ You need to create a **filter** helper sensor in Home Assistant that applies an 
 2. Choose **Filter**
 3. Configure as follows:
 
-| Field | Value |
-|---|---|
-| Name | `EWMA - Grid Active Power` (or similar) |
-| Input entity | Your grid active power sensor (e.g. `sensor.sigen_0_plant_grid_sensor_active_power`) |
-| Filter | Exponential Moving Average |
-| Time constant | `0` (or adjust — higher values = more smoothing, slower response) |
-| Precision | `0` |
+| Field | Value used in this system | Notes |
+|---|---|---|
+| Name | `EWMA - Grid Active Power` | Or similar |
+| Input entity | `sensor.sigen_0_plant_grid_sensor_active_power` | ← REPLACE with your grid active power sensor |
+| Filter | Exponential Moving Average | |
+| Time constant | `10` | Higher = more smoothing, slower response — adjust to taste |
+| Window size | `1` | |
+| Precision | `2` | |
 
-The resulting entity (e.g. `sensor.ewma_grid_active_power`) is what the automation uses. Adjust the time constant to suit your system's noise characteristics — a value of 0 gives a light smooth; higher values give more aggressive filtering at the cost of slower response.
+The resulting entity (e.g. `sensor.ewma_grid_active_power`) is what the automation uses. A time constant of `10` was used in this system — adjust to suit your system's noise characteristics. Higher values give more aggressive smoothing at the cost of slower response to genuine changes.
 
 ### 2. EV DC Charger Cooldown Timer
 
