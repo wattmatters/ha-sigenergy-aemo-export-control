@@ -20,9 +20,9 @@ These automations were developed with assistance from [Claude](https://claude.ai
 |---|---|
 | [AEMO Critical Event Export Control](./aemo-critical-event-export/) | Maximises battery export during AEMO critical price events |
 | [Peak Export Control](./peak-export-control/) | Manages battery export during the evening peak feed-in bonus period, with Zero Hero protection |
-| [Supplemental Grid Charging](./supplemental-grid-charging/) | *(coming soon)* |
-| [EV DC Charger Stop Cooldown Timer](./ev-dc-charger-cooldown/) | *(coming soon)* |
-| [Grid Bias Offset Export](./grid-bias-offset-export/) | *(coming soon)* |
+| [Supplemental Grid Charging](./supplemental-grid-charging/) | Manages battery charging during a cheap or free electricity rate period |
+| [EV DC Charger Stop Cooldown Timer](./ev-dc-charger-cooldown/) | Starts a cooldown timer when DC charging stops, preventing other automations from acting before load sensors settle |
+| [Grid Bias Offset Export](./grid-bias-offset-export/) | Applies a small persistent export offset to eliminate metering bias imports the inverter cannot detect |
 
 ---
 
@@ -59,7 +59,13 @@ Several helpers are referenced across multiple automations. Create these once in
 | `input_number.battery_minimum_soc_end_of_export` | Number | Peak Export |
 | `input_number.battery_export_suggested_rate` | Number *(optional)* | Peak Export |
 | `input_text.battery_export_strategy` | Text *(optional)* | Peak Export |
-| `input_number.battery_charge_suggested_rate` | Number *(optional)* | AEMO Critical |
+| `input_number.battery_charge_suggested_rate` | Number *(optional)* | AEMO Critical, Supplemental Charging |
+| `input_boolean.battery_supplemental_charging_required` | Toggle | Supplemental Charging |
+| `timer.ev_dc_charger_stop_cooldown` | Timer | EV Cooldown, Grid Bias Offset |
+| `input_number.grid_bias_offset_export_rate` | Number | Grid Bias Offset |
+| `input_boolean.grid_bias_offset_active` | Toggle | Grid Bias Offset |
+| `input_boolean.managed_period_active` | Toggle | Grid Bias Offset |
+| `sensor.ewma_grid_active_power` | Filter helper | Grid Bias Offset — see that automation's README for setup |
 
 See each automation's individual README for the full list of helpers it requires and how they are used.
 
