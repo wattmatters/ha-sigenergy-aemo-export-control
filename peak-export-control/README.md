@@ -20,21 +20,28 @@ Runs every minute between a configurable monitoring window (e.g. 2:30–10 PM) a
 
 ## Rate calculation logic
 
+The goal is to export as much energy as possible during the peak window — up to any retailer cap (e.g. 10 kWh over 2 hours) — while ensuring the battery doesn't fall below a minimum SOC needed to cover overnight household consumption. There is no point exporting at a peak feed-in rate if it means having to import from the grid the following morning at a higher rate.
+
 The export rate is recalculated every minute using:
 
 ```
-SOC headroom = current SOC% − minimum target SOC%
-SOC-limited rate = (SOC headroom / 100 × battery capacity kWh) / hours remaining
+SOC headroom = current SOC% − minimum overnight reserve SOC%
+Energy available = (SOC headroom / 100) × battery capacity kWh
+SOC-limited rate = energy available / hours remaining
 rate = max(Zero Hero minimum, suggested rate)
 rate = min(rate, SOC-limited rate)
 rate = min(rate, peak export maximum)
 ```
 
-This ensures the battery reaches the minimum target SOC by the end of the export window, exports at the suggested rate where possible, never falls below the Zero Hero minimum, and never exceeds the configured maximum.
+- **SOC headroom** is the energy above the overnight reserve — only this is available for export
+- **SOC-limited rate** is the maximum rate that would exhaust the headroom exactly by the end of the window — it prevents the battery falling below the reserve
+- The **suggested rate** comes from the Battery Export Calculator Node-RED flow, which factors in solar forecast, household consumption during the window, and the retailer's export cap
+- The **Zero Hero minimum** acts as a floor to preserve the feed-in bonus regardless of what the SOC calculation suggests
+- The **peak export maximum** is a hard ceiling set by your inverter or DNSP export limit
 
 ### Zero Hero protection
 
-The "Zero Hero" concept applies to tariff plans that pay a daily bonus for keeping net grid import below a threshold during the peak period — rather than penalising zero export directly. The distinction is subtle but important:
+The "Zero Hero" concept applies to tariff plans that pay a daily bonus for keeping net grid import below a threshold during the peak period:
 
 - The retailer pays a bonus (e.g. $1/day) if your net import stays below a small allowance over the full peak period
 - Because of metering bias (see the [Grid Bias Offset Export](../grid-bias-offset-export/) automation), the inverter may believe it is at net zero while the utility meter records a small import
