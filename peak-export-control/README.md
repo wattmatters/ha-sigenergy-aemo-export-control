@@ -34,9 +34,15 @@ This ensures the battery reaches the minimum target SOC by the end of the export
 
 ### Zero Hero protection
 
-Some feed-in tariff arrangements penalise zero export during a peak period. The `input_number.battery_minimum_export_rate_zero_hero` helper sets a floor rate (e.g. 0.5 kW) that the automation will always maintain during the export window, even if the SOC calculation would otherwise suggest stopping.
+The "Zero Hero" concept applies to tariff plans that pay a daily bonus for keeping net grid import below a threshold during the peak period — rather than penalising zero export directly. The distinction is subtle but important:
 
-Set this to `0` if your tariff has no zero-export penalty.
+- The retailer pays a bonus (e.g. $1/day) if your net import stays below a small allowance over the full peak period
+- Because of metering bias (see the [Grid Bias Offset Export](../grid-bias-offset-export/) automation), the inverter may believe it is at net zero while the utility meter records a small import
+- To account for this, a minimum export floor (e.g. 30 W average, expressed as a kW rate) is applied to ensure the utility meter sees a net export, keeping you safely below the import threshold and preserving the bonus
+
+The `input_number.battery_minimum_export_rate_zero_hero` helper sets this floor rate. The value should be calibrated to your own metering bias — in this system 0.5 kW was used as a conservative floor to reliably stay below the retailer's import allowance.
+
+Set this to `0` if your tariff has no such bonus or import threshold.
 
 ---
 
